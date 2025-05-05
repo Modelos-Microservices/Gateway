@@ -2,7 +2,7 @@ import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post, Query
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { NATS_SERVICE, ORDER_SERVICE } from 'src/config';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { firstValueFrom } from 'rxjs';
+import { first, firstValueFrom } from 'rxjs';
 import { OrderPaginationDto } from './dto/order-pagination.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { StatusOrderDto } from './dto/status-order.dto';
@@ -22,6 +22,18 @@ export class OrdersController {
     } catch (error) {
       throw new RpcException(error)
     }
+  }
+
+  @Get('receipts')
+  async getAllReceipts(@Query() pagination: PaginationDto){
+    try{
+      const receipts = await firstValueFrom(this.orders_client.send({cmd: 'getAllReceipts'}, pagination));
+      return receipts
+    } catch (error) {
+      throw new RpcException(error)
+    }
+
+    
   }
 
   @Get(':status')
