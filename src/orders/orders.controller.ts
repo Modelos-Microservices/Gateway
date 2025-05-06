@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { NATS_SERVICE, ORDER_SERVICE } from 'src/config';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -6,6 +6,10 @@ import { first, firstValueFrom } from 'rxjs';
 import { OrderPaginationDto } from './dto/order-pagination.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { StatusOrderDto } from './dto/status-order.dto';
+import { KeycloakAuthGuard } from 'src/keyCloak/keycloak-auth.guard';
+import { RolesGuard } from 'src/keyCloak/keycloak-roles.guard';
+import { Protect } from 'src/keyCloak/protect.decorator';
+import { Roles } from 'src/keyCloak/role.decorator';
 
 
 @Controller('orders')
@@ -14,6 +18,9 @@ export class OrdersController {
     @Inject(NATS_SERVICE) private readonly orders_client: ClientProxy
   ) { }
 
+  @UseGuards(KeycloakAuthGuard, RolesGuard)
+  @Protect()
+  @Roles('user', 'admin')
   @Get()
   async getAllOrders(@Query() pagination: OrderPaginationDto) {
     try {
