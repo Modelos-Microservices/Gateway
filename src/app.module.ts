@@ -6,9 +6,15 @@ import { APP_GUARD } from '@nestjs/core';
 import { KeycloakAuthGuard } from './keyCloak/keycloak-auth.guard';
 import { RolesGuard } from './keyCloak/keycloak-roles.guard';
 import { KeyCloakAuthModule } from './keyCloak/keycloak-auth.module';
+import { UserModule } from './user/user.module';
+import { UserService } from './user/user.service';
+import { CategoriesModule } from './categories/categories.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { FavoritesModule } from './favorites/favorites.module';
+import { DebtsModule } from './debts/debts.module';
 
 @Module({
-  imports: [ProductsModule, OrdersModule, NatsModule, KeyCloakAuthModule],
+  imports: [ProductsModule, OrdersModule, NatsModule, KeyCloakAuthModule, UserModule, CategoriesModule, ReviewsModule, FavoritesModule, DebtsModule],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: KeycloakAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],
 })

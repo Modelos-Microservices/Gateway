@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { NATS_SERVICE, ORDER_SERVICE } from 'src/config';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -10,17 +10,23 @@ import { KeycloakAuthGuard } from 'src/keyCloak/keycloak-auth.guard';
 import { RolesGuard } from 'src/keyCloak/keycloak-roles.guard';
 import { Protect } from 'src/keyCloak/protect.decorator';
 import { Roles } from 'src/keyCloak/role.decorator';
+import { Public } from 'src/keyCloak/public.decorator';
+import * as jwt from 'jsonwebtoken';
+import { consumerOpts } from 'nats';
+import { UserService } from 'src/user/user.service';
 
 
 @Controller('orders')
 export class OrdersController {
   constructor(
-    @Inject(NATS_SERVICE) private readonly orders_client: ClientProxy
+    @Inject(NATS_SERVICE) private readonly orders_client: ClientProxy,
+    @Inject(UserService) private readonly userService: UserService
   ) { }
 
   @UseGuards(KeycloakAuthGuard, RolesGuard)
   @Protect()
   @Roles('user', 'admin')
+  //@Public()
   @Get()
   async getAllOrders(@Query() pagination: OrderPaginationDto) {
     try {
@@ -31,6 +37,7 @@ export class OrdersController {
     }
   }
 
+  @Public()
   @Get('receipts')
   async getAllReceipts(@Query() pagination: PaginationDto){
     try{
@@ -43,6 +50,7 @@ export class OrdersController {
     
   }
 
+
   @Get(':status')
   async getAllOrdersByStatus(@Param() statusDto: StatusOrderDto, @Query() pagination: PaginationDto) {
     const data: OrderPaginationDto = { ...pagination, status: statusDto.status }
@@ -54,9 +62,12 @@ export class OrdersController {
     }
   }
 
-
+  //@UseGuards(KeycloakAuthGuard, RolesGuard)
+  //@Protect()
+  //@Roles('user', 'admin')
+  @Public()
   @Post()
-  async createOrder(@Body() createOrderDto: CreateOrderDto) {
+  async createOrder(@Body() createOrderDto: CreateOrderDto, @Req() request) {
     try {
       return await firstValueFrom(this.orders_client.send({ cmd: 'createOrder' }, createOrderDto))
     } catch (error) {
@@ -83,6 +94,24 @@ export class OrdersController {
       return proudct
     } catch (error) {
       throw new RpcException(error)
+    }
+  }
+
+
+  extractUserIdFromToken(token: string): string {
+    try {
+      // Decodificar el token sin verificar la firma
+      const decoded = jwt.decode(token);
+      
+      // El ID suele estar en el campo 'sub' de un token de Keycloak
+      if (decoded && typeof decoded === 'object' && decoded.sub) {
+        return decoded.sub;
+      }
+      
+      throw new Error('No se pudo extraer el ID del usuario del token');
+    } catch (error) {
+      console.error('Error al extraer el ID del usuario:', error);
+      throw new Error('Error al procesar el token de autenticación');
     }
   }
 

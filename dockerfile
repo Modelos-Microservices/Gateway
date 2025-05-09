@@ -1,4 +1,4 @@
-FROM node:alpine
+FROM node:20-alpine
 #RUN apt-get update && apt-get install -y procps
 WORKDIR /usr/src/app
 

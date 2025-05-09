@@ -9,6 +9,6 @@ export class UpdateProductDto extends PartialType(CreateProductDto) {
     @IsPositive()
     @IsNotEmpty()
     @Type(() => Number)
-    id?: number
+    id: number
 
 }
