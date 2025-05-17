@@ -17,6 +17,14 @@ async function bootstrap() {
         })
     );
 
+    // Enable CORS
+    app.enableCors({
+    origin: 'http://localhost:4200', // URL de tu aplicación Angular
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+    allowedHeaders: 'Content-Type, Accept, Authorization'
+  });
+
 
     app.useGlobalFilters(new RpcCustomExceptionFilter())
 

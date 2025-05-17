@@ -25,7 +25,7 @@ export class OrdersController {
 
   @UseGuards(KeycloakAuthGuard, RolesGuard)
   @Protect()
-  @Roles('user', 'admin')
+  @Roles('admin')
   //@Public()
   @Get()
   async getAllOrders(@Query() pagination: OrderPaginationDto) {

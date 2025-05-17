@@ -12,9 +12,11 @@ import { CategoriesModule } from './categories/categories.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { DebtsModule } from './debts/debts.module';
+import { HttpModule } from '@nestjs/axios';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [ProductsModule, OrdersModule, NatsModule, KeyCloakAuthModule, UserModule, CategoriesModule, ReviewsModule, FavoritesModule, DebtsModule],
+  imports: [ProductsModule, OrdersModule, NatsModule, KeyCloakAuthModule, UserModule, CategoriesModule, ReviewsModule, FavoritesModule, DebtsModule, HttpModule, ConfigModule],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: KeycloakAuthGuard }, { provide: APP_GUARD, useClass: RolesGuard }],
 })
