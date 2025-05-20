@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Inject, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { NATS_SERVICE, ORDER_SERVICE } from 'src/config';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -11,9 +11,11 @@ import { RolesGuard } from 'src/keyCloak/keycloak-roles.guard';
 import { Protect } from 'src/keyCloak/protect.decorator';
 import { Roles } from 'src/keyCloak/role.decorator';
 import { Public } from 'src/keyCloak/public.decorator';
-import * as jwt from 'jsonwebtoken';
-import { consumerOpts } from 'nats';
 import { UserService } from 'src/user/user.service';
+import { UserInfo } from 'src/common/entities/user.entity';
+import { CreateOrderItemDto } from './dto/create-order-item.dto';
+import { DeleteOrderItemDto } from './dto/delete-order-item.dto';
+import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 
 
 @Controller('orders')
@@ -23,10 +25,10 @@ export class OrdersController {
     @Inject(UserService) private readonly userService: UserService
   ) { }
 
-  @UseGuards(KeycloakAuthGuard, RolesGuard)
-  @Protect()
-  @Roles('admin')
-  //@Public()
+  // @UseGuards(KeycloakAuthGuard, RolesGuard)
+  // @Protect()
+  // @Roles('admin')
+  @Public()
   @Get()
   async getAllOrders(@Query() pagination: OrderPaginationDto) {
     try {
@@ -39,18 +41,36 @@ export class OrdersController {
 
   @Public()
   @Get('receipts')
-  async getAllReceipts(@Query() pagination: PaginationDto){
-    try{
-      const receipts = await firstValueFrom(this.orders_client.send({cmd: 'getAllReceipts'}, pagination));
+  async getAllReceipts(@Query() pagination: PaginationDto) {
+    try {
+      const receipts = await firstValueFrom(this.orders_client.send({ cmd: 'getAllReceipts' }, pagination));
       return receipts
     } catch (error) {
       throw new RpcException(error)
     }
-
-    
   }
 
+  @Public()
+  @Get('cart')
+  async getUserCart(@Req() request) {
+    let user: UserInfo;
+    try {
+      user = this.userService.extractUserInfoFromToken(request);
+      if (!user) {
+        throw new RpcException({ status: 404, message: 'User ID not found in token' });
+      }
+      const order = await firstValueFrom(this.orders_client.send({ cmd: 'getUserCart' }, user.user_id))
+      if(!order){
+        return {message: 'El Ususerio no tienen un cart'}
+      }
 
+      return order
+    } catch (error) {
+      throw new RpcException(error)
+    }
+  }
+
+  @Public()
   @Get(':status')
   async getAllOrdersByStatus(@Param() statusDto: StatusOrderDto, @Query() pagination: PaginationDto) {
     const data: OrderPaginationDto = { ...pagination, status: statusDto.status }
@@ -73,9 +93,83 @@ export class OrdersController {
     } catch (error) {
       throw new RpcException(error)
     }
-
   }
 
+
+  @UseGuards(KeycloakAuthGuard, RolesGuard)
+  @Protect()
+  @Roles('user')
+  @Post('add')
+  async AddOneProduct(@Body() createOrderItemDto: CreateOrderItemDto, @Req() request) {
+    let user: UserInfo;
+    try {
+      user = this.userService.extractUserInfoFromToken(request);
+      if (!user) {
+        throw new RpcException({ status: 404, message: 'User ID not found in token' });
+      }
+      const payload = { ...createOrderItemDto, user_id: user.user_id }
+      return await firstValueFrom(this.orders_client.send({ cmd: 'addOneProduct' }, payload))
+    } catch (error) {
+      throw new RpcException(error)
+    }
+  }
+
+  //@UseGuards(KeycloakAuthGuard, RolesGuard)
+  //@Protect()
+  //@Roles('user')
+  @Post('pay')
+  async payOrder(@Req() request) {
+    let user: UserInfo;
+    try {
+      user = this.userService.extractUserInfoFromToken(request);
+      if (!user) {
+        
+        throw new RpcException({ status: 404, message: 'User ID not found in token' });
+      }
+      return await firstValueFrom(this.orders_client.send({ cmd: 'payOrder' }, user.user_id))
+    } catch (error) {
+      throw new RpcException(error)
+    }
+  }
+
+  @Public()
+  @Patch('delete')
+  async deleteOrderItem(@Body() deleteOrderItemDto: DeleteOrderItemDto, @Req() request) {
+    let user: UserInfo;
+    try {
+      user = this.userService.extractUserInfoFromToken(request);
+      if (!user) {
+        throw new RpcException({ status: 404, message: 'User ID not found in token' });
+      }
+
+      const payload = { ...deleteOrderItemDto, user_id: user.user_id }
+
+      return await firstValueFrom(this.orders_client.send({ cmd: 'deleteOrderItem' }, payload))
+    } catch (error) {
+      throw new RpcException(error)
+    }
+  }
+
+
+  @Public()
+  @Patch('update')
+  async updateOrderItem(@Body() updateOrderItemDto: UpdateOrderItemDto, @Req() request) {
+    let user: UserInfo;
+    try {
+      user = this.userService.extractUserInfoFromToken(request);
+      if (!user) {
+        throw new RpcException({ status: 404, message: 'User ID not found in token' });
+      }
+      const payload = { ...updateOrderItemDto, user_id: user.user_id }
+
+      return await firstValueFrom(this.orders_client.send({ cmd: 'updateOrderItem' }, payload))
+    } catch (error) {
+      throw new RpcException(error)
+    }
+  }
+
+
+  @Public()
   @Patch(':id')
   async updateOrder(@Param('id', ParseUUIDPipe) id: string, @Body() statusOrderDto: StatusOrderDto) {
     const data = { ...statusOrderDto, id }
@@ -98,22 +192,10 @@ export class OrdersController {
   }
 
 
-  extractUserIdFromToken(token: string): string {
-    try {
-      // Decodificar el token sin verificar la firma
-      const decoded = jwt.decode(token);
-      
-      // El ID suele estar en el campo 'sub' de un token de Keycloak
-      if (decoded && typeof decoded === 'object' && decoded.sub) {
-        return decoded.sub;
-      }
-      
-      throw new Error('No se pudo extraer el ID del usuario del token');
-    } catch (error) {
-      console.error('Error al extraer el ID del usuario:', error);
-      throw new Error('Error al procesar el token de autenticación');
-    }
-  }
+
+
+
+
 
 
 }
